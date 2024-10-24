@@ -13,7 +13,7 @@ import java.security.SecureRandom; // Generates random salt (random value) for k
 public class FileEncryptor {
 
     private static final String algo = "AES"; // AES encryption algorithm
-    private static final int saltLength = 16; // salt length for key generation
+    private static final int saltLength = 16; // Salt length for key generation
     private static final int ITERATIONS = 100000; // Number of iterations for PBKDF2
     private static final int keyLength = 128; // AES-128 key length
 
@@ -34,7 +34,7 @@ public class FileEncryptor {
         // Generates secretKey using the keySpec values of password, salt, iterations and key length
         SecretKey secretKey = keyFactory.generateSecret(keySpec);
 
-        // returns AES-compatible secret key
+        // Returns AES-compatible secret key
         return new SecretKeySpec(secretKey.getEncoded(), algo);
     }
 
@@ -43,9 +43,38 @@ public class FileEncryptor {
 
         // SecureRandom to generate random byte values
         SecureRandom randomNum = new SecureRandom();
-        byte[] salt = new byte[saltLength]; // byte array creation for salt with defined length values
-        randomNum.nextBytes(salt); // fill the array with randomNum byte values that were generated using SecureRandom
-        return salt; // return the generated salt value
+        byte[] salt = new byte[saltLength]; // Byte array creation for salt with defined length values
+        randomNum.nextBytes(salt); // Fill the array with randomNum byte values that were generated using SecureRandom
+        return salt; // Return the generated salt value
     }
 
+    // Method to encrypt file using AES encryption
+    public static void encryptFile(InputStream inputFileStream, OutputStream outputFileStream, SecretKey encryptionKey) throws Exception {
+
+        // Create cipher using AES
+        // A factory method that creates a Cipher object for the specified (AES) algorithm
+        Cipher encryptionCipher = Cipher.getInstance(algo);
+
+        // Initialize the cipher in encryption mode. It will use the encryptionKey value to perform the encryption
+        cipher.init(Cipher.ENCRYPT_MODE, encryptionKey);
+
+        // Wrapping the output stream for encryption
+        CipherOutputStream encryptedOutputStream = new CipherOutputStream(outputFileStream, encryptionCipher);
+
+        /* dataBuffer is a temporary storage array that can hold upto 1024 bytes = 1KB of data at a time while
+        * reading and writing a file. This value can be changed. */
+        byte[] dataBuffer = new byte[1024];
+
+        // variable to hold the number of bytes read
+        int bytesRead;
+
+        /*  inputFileStream.read(dataBuffer) reads up to 1024 bytes of data from the input stream into the buffer array
+        *   If there's data available then the buffer is filled upto 1024 bytes
+        *   If it reaches EOF then it returns -1, meaning there's no more data to read hence breaking the while loop */
+        while (bytesRead = inputFileStream.read(dataBuffer) != -1){
+            encryptedOutputStream.write(dataBuffer, 0, bytesRead); // Writes the contents of the buffer to encryptedOutputStream (The encrypted output stream)
+        }
+
+        encryptedOutputStream.close(); // Close the stream
+    }
 }
