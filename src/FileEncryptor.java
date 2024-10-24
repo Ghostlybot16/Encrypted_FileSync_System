@@ -38,4 +38,14 @@ public class FileEncryptor {
         return new SecretKeySpec(secretKey.getEncoded(), algo);
     }
 
+    // Method to generate random salt values
+    public static byte[] createSalt() {
+
+        // SecureRandom to generate random byte values
+        SecureRandom randomNum = new SecureRandom();
+        byte[] salt = new byte[saltLength]; // byte array creation for salt with defined length values
+        randomNum.nextBytes(salt); // fill the array with randomNum byte values that were generated using SecureRandom
+        return salt; // return the generated salt value
+    }
+
 }
