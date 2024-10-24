@@ -1,3 +1,5 @@
+import jdk.internal.util.xml.impl.Input;
+
 import java.io.*; // Input/Output classes for file handling
 import javax.crypto.Cipher; // Provides cryptographic encryption and decryption functions
 import javax.crypto.SecretKey; // Secret key used in encryption and decryption
@@ -56,7 +58,7 @@ public class FileEncryptor {
         Cipher encryptionCipher = Cipher.getInstance(algo);
 
         // Initialize the cipher in encryption mode. It will use the encryptionKey value to perform the encryption
-        cipher.init(Cipher.ENCRYPT_MODE, encryptionKey);
+        encryptionCipher.init(Cipher.ENCRYPT_MODE, encryptionKey);
 
         // Wrapping the output stream for encryption
         CipherOutputStream encryptedOutputStream = new CipherOutputStream(outputFileStream, encryptionCipher);
@@ -71,10 +73,38 @@ public class FileEncryptor {
         /*  inputFileStream.read(dataBuffer) reads up to 1024 bytes of data from the input stream into the buffer array
         *   If there's data available then the buffer is filled upto 1024 bytes
         *   If it reaches EOF then it returns -1, meaning there's no more data to read hence breaking the while loop */
-        while (bytesRead = inputFileStream.read(dataBuffer) != -1){
+        while ((bytesRead = inputFileStream.read(dataBuffer)) != -1){
             encryptedOutputStream.write(dataBuffer, 0, bytesRead); // Writes the contents of the buffer to encryptedOutputStream (The encrypted output stream)
         }
 
         encryptedOutputStream.close(); // Close the stream
+    }
+
+    // Method to decrypt file
+    // Uses the same logic as encryption but this method runs in decryption mode, hence it decrypts the data
+    public static void decryptFile(InputStream inputFileStream, OutputStream outputFileStream, SecretKey encryptionKey) throws Exception{
+        Cipher encryptionCipher = Cipher.getInstance(algo);
+
+        // Initialize the cipher in decryption mode. It will use the encryptionKey value to perform the decryption
+        encryptionCipher.init(Cipher.DECRYPT_MODE, encryptionKey);
+
+        // Creation of a CipherInputStream to decrypt the data as it is read
+        // It wraps the input stream for decryption
+        CipherInputStream decryptedInputStream = new CipherInputStream(inputFileStream, encryptionCipher);
+
+        byte[] dataBuffer = new byte[1024];
+        int bytesRead;
+
+        /*  Same logic as before,
+        *   A buffer array of 1024bytes is created to temporarily store data as it's being read from the input stream
+        *   decryptedInputStream.read(dataBuffer) reads encrypted data from the input stream, decrypts it and places the
+        *   decrypted data into the buffer.
+        *   If data is avaibale, the decrypted data is filled upto 1024bytes
+        *   If it reaches EOF, then it returns -1, thus breaking the while loop*/
+        while((bytesRead = decryptedInputStream.read(dataBuffer)) != -1){
+            outputFileStream.write(dataBuffer, 0, bytesRead);
+        }
+
+        decryptedInputStream.close(); //Close the stream
     }
 }
