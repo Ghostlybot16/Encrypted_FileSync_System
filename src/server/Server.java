@@ -11,7 +11,7 @@ public class Server {
     private static final int serverListenPort = 55000;
 
     // The directory where the received files sent by clients will be saved
-    private static final String receivedFilesDir = "received_files/";
+    private static final String receivedFilesDir = "../received_files/";
 
     public static void main(String[] args) {
 
