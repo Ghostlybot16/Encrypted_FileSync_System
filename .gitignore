@@ -27,3 +27,11 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+# Ignore IntelliJ IDEA files
+./untitled.iml
+.idea/*.xml
+.name
+
+# Ignore class files
+*.class

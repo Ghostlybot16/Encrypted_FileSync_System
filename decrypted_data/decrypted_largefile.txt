@@ -1,0 +1,11 @@
+This is a large test file for encryption.
+
+The quick brown fox jumps over the lazy dog.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla accumsan justo eget nisi dictum, id posuere magna vulputate. Quisque consequat, odio id sodales pharetra, velit nulla efficitur velit, nec scelerisque ligula enim vitae dolor.
+Donec ac ligula ligula. Vivamus scelerisque, metus ac facilisis luctus, nulla mauris efficitur justo, vitae rutrum libero mauris eu justo. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.
+
+Ut venenatis, velit a auctor accumsan, mi justo tempor tortor, sit amet cursus nulla risus et est. Mauris vel ultricies purus, sit amet aliquam lacus. In hac habitasse platea dictumst. Integer viverra, erat in placerat convallis, orci purus vulputate purus, eu euismod nisi mi vel eros. Phasellus vitae libero at erat sodales malesuada.
+
+[... repeat multiple paragraphs or similar content ...]
+
+This is a large test file for encryption and decryption, designed to ensure that the system can handle files with more content.
