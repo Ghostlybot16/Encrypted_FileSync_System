@@ -3,10 +3,12 @@ package server; // Declares that this file is part of the 'server' package
 import java.io.*;
 import java.net.ServerSocket; // Import used to create a server socket
 import java.net.Socket; // Import used to create client-server communication
-
 import javax.crypto.SecretKey;
 import utilities.FileEncryptor;
-
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.List;
+import java.util.ArrayList;
 public class Server {
 
     // Defines the port number that the server will listen on
@@ -18,6 +20,10 @@ public class Server {
 
     // The directory where the decrypted files will be saved
     private static final String decryptedFolder = "../decrypted_data";
+
+    // Thread pool size
+    // Number of threads to handle clients
+    private static final int threadPoolSize = 4;
 
     public static void main(String[] args) {
 
@@ -35,6 +41,9 @@ public class Server {
 
         // Check to see if the directory that is storing the decrypted data exists
         directoryStatus(decryptedFolder);
+
+        // Creates a fixed pool size of threads (4 threads)
+        ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
 
         try{
             Thread.sleep(2000); // Delay for 2 seconds
@@ -56,13 +65,14 @@ public class Server {
                 Socket clientSocket = serverSocket.accept(); // Accept the client
                 System.out.println("Client connected.");
 
-                // Method called to handle the file received from the client
-                receiveFileFromClientAndDecrypt(clientSocket); //THIS WILL NEED TO BE ALTERED
-
-                clientSocket.close(); // Close client socket after file has been transferred
+                // Calling ClientHandler instance to the threadPool
+                // The thread pool will handle the execution of ClientHandler, hence allowing the server to accept new clients
+                threadPool.execute(new ClientHandler(clientSocket));
             }
         } catch (IOException e){
             e.printStackTrace();
+        } finally {
+            threadPool.shutdown(); // Shutdown thread pool when server stops
         }
     }
 
@@ -87,6 +97,30 @@ public class Server {
         } else {
             System.out.println("Directory already exists at: " + directory.getAbsolutePath());
         }
+    }
+
+    // Client Handler to handle client connection
+    // Implementing Runnable allows each instance to be run in a separate thread
+    private static class ClientHandler implements Runnable {
+        private final Socket clientSocket;
+
+        public ClientHandler(Socket clientSocket){
+            this.clientSocket = clientSocket;
+        }
+
+        // Method called when thread starts
+        @Override
+        public void run() {
+            try {
+                // Recieves file from client and decrypts it
+                receiveFileFromClientAndDecrypt(clientSocket);
+                clientSocket.close(); // Close socket after file transfer
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
     }
 
     private static void receiveFileFromClientAndDecrypt(Socket clientSocket) {
