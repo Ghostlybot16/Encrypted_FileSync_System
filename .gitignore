@@ -33,5 +33,3 @@ bin/
 .idea/*.xml
 .name
 
-# Ignore class files
-*.class

@@ -49,11 +49,11 @@ public class Client {
             return; // Exits if file not found
         }
 
-        System.out.println("You have selected: " + nameOfFile.getName());
+        System.out.println("Chosen file to encrypt: " + nameOfFile.getName());
         System.out.println("\n");
 
         // User inputs the password which gets used to encrypt
-        System.out.println("Enter your password for encryption:");
+        System.out.println("Enter a password for encryption: ");
         String userPassword = scanner.nextLine();
 
         // Automatically retrieve the file name using getName() to create the encrypted file name
@@ -62,16 +62,18 @@ public class Client {
         String encryptedFileName = "encrypted_" + primaryNameOfFile; // example: "encrypted_testfile.txt"
 
         // Checking to see if the directory where the encrypted data will be stored already exists
-        File encryptedFolder = new File("../../encrypted_data");
+        File encryptedFolder = new File("../encrypted_data");
 
         //  If the encryptedFolder does not exist then it creates the directory
         if(!encryptedFolder.exists()){
             if(encryptedFolder.mkdirs()){
-                System.out.println("Directory 'encrypted_data' created successfully.");
+                System.out.println("Directory 'encrypted_data' created successfully at: " + encryptedFolder.getAbsolutePath());
             } else {
-                System.out.println("Failed to create 'encrypted_data' directory.");
+                System.out.println("Failed to create 'encrypted_data' directory at: " + encryptedFolder.getAbsolutePath());
                 return;
             }
+        } else {
+            System.out.println("'encrypted_data' directory already exists at: " + encryptedFolder.getAbsolutePath());
         }
 
         // Generate salt and create secretkey from password and salt
@@ -91,7 +93,7 @@ public class Client {
                 InputStream inputFileStream = new FileInputStream(nameOfFile);
                 OutputStream encryptedOutputStream = new FileOutputStream(encryptedFile);
                 ) {
-            // Encrypt the raw file and save the encrypted version
+            // Encrypt the raw file by calling FileEncryptor
             FileEncryptor.encryptFile(inputFileStream, encryptedOutputStream, secretKey);
             System.out.println("File encrypted successfully as: " + encryptedFileName);
         } catch(Exception e){
@@ -117,8 +119,15 @@ public class Client {
             DataOutputStream outgoingDataStream = new DataOutputStream(clientToServerStream)
         ){
 
-            // Send file name to the server
+            //  Send file name to the server
             outgoingDataStream.writeUTF(encryptedFile.getName());
+
+            //  Send salt length and the salt value itself
+            outgoingDataStream.writeInt(salt.length);
+            outgoingDataStream.write(salt);
+
+            //  Send user-input password to the server
+            outgoingDataStream.writeUTF(userPassword);
 
             // Send file data in chunks of 4KB
             byte[] dataBuffer = new byte[4096]; // Buffer to store file data

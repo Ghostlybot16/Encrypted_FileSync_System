@@ -4,6 +4,9 @@ import java.io.*;
 import java.net.ServerSocket; // Import used to create a server socket
 import java.net.Socket; // Import used to create client-server communication
 
+import javax.crypto.SecretKey;
+import utilities.FileEncryptor;
+
 public class Server {
 
     // Defines the port number that the server will listen on
@@ -12,6 +15,9 @@ public class Server {
 
     // The directory where the received files sent by clients will be saved
     private static final String receivedFilesDir = "../received_files/";
+
+    // The directory where the decrypted files will be saved
+    private static final String decryptedFolder = "../decrypted_data";
 
     public static void main(String[] args) {
 
@@ -26,6 +32,9 @@ public class Server {
 
         // Calling a method to check if the directory for saving files from the client exists
         directoryStatus(receivedFilesDir);
+
+        // Check to see if the directory that is storing the decrypted data exists
+        directoryStatus(decryptedFolder);
 
         try{
             Thread.sleep(2000); // Delay for 2 seconds
@@ -48,7 +57,7 @@ public class Server {
                 System.out.println("Client connected.");
 
                 // Method called to handle the file received from the client
-                receiveFileFromClient(clientSocket);
+                receiveFileFromClientAndDecrypt(clientSocket); //THIS WILL NEED TO BE ALTERED
 
                 clientSocket.close(); // Close client socket after file has been transferred
             }
@@ -63,22 +72,24 @@ public class Server {
         // Create a file object that represents the path to the directory
         File directory = new File(directoryPath);
 
-        // Checking to see if the directory to store data from the client already exists
+        // Checking to see if the directory to store data from the client
         if(!directory.exists()){
             if(directory.mkdirs()) {    // Attempts to create the directory
 
                 // Outputs path if directory gets created
-                System.out.println("Directory created at: " + directoryPath);
+                System.out.println("Directory created successfully at: " + directory.getAbsolutePath());
+
             }
             else{
-
                 // Error message if directory fails to create
-                System.out.println("Failed to create directory at: " + directoryPath);
+                System.out.println("Failed to create directory at: " + directory.getAbsolutePath());
             }
+        } else {
+            System.out.println("Directory already exists at: " + directory.getAbsolutePath());
         }
     }
 
-    private static void receiveFileFromClient(Socket clientSocket) {
+    private static void receiveFileFromClientAndDecrypt(Socket clientSocket) {
 
         // try with resources block to automatically close the input stream once it's done being used
         try(
@@ -92,11 +103,24 @@ public class Server {
 
             // Read the file name sent from the client
             // clientFileName stores the name of the file being transferred from the client
-            String clientFileName = dataStreamFromClient.readUTF();
+            String encryptedClientFileName = dataStreamFromClient.readUTF();
+
+            //  Receive salt length and salt value from client
+            int saltLength = dataStreamFromClient.readInt();
+            byte[] salt = new byte[saltLength]; // Byte array to store the salt value
+            dataStreamFromClient.readFully(salt);
+
+            // Read the password that the client used for encryption
+            String password = dataStreamFromClient.readUTF();
+
+            // Output to the terminal to communicate that the FileName and Password sent by the client has been received by the server
+            System.out.println("Received password from client: " + password);
+            System.out.println("Received encrypted file name: " + encryptedClientFileName);
+            System.out.println("Received salt value: " + saltToHex(salt));
 
             // Creates a file object that shows where the data from client will be saved within the server
             // The file will be stored in receivedFilesDir location with its filename
-            File destinationFileInServer = new File(receivedFilesDir + clientFileName);
+            File destinationFileInServer = new File(receivedFilesDir + encryptedClientFileName);
 
 
             // fileOutputStream handles writing the data to the file in the server
@@ -113,13 +137,50 @@ public class Server {
                 }
 
                 // Outputs a confirmation message to the terminal that the process has been executed successfully
-                System.out.println("File received and saved as: " + destinationFileInServer.getAbsolutePath());
+                System.out.println("Encrypted file received and saved at: " + destinationFileInServer.getAbsolutePath());
             }
 
+            // Creation of secretKey using the received password and salt from client
+            // Essentially the secretkey generated in the server should match the secretkey generated in the client
+            SecretKey secretKey = FileEncryptor.KeyGenFromPassword(password,salt);
+
+            // Creating a decrypted file directory
+            String decryptedFolderName = "decrypted_" + encryptedClientFileName;
+
+            // Decrypt the file and save it to the 'decrypted_data' directory
+            File decryptedClientFile = new File(decryptedFolder, decryptedFolderName);
+            try(
+                    InputStream encryptedInputStream = new FileInputStream(destinationFileInServer);
+                    OutputStream decryptedOutputStream = new FileOutputStream(decryptedClientFile);
+                    ){
+
+                // Decrypting the file by calling FileEncryptor
+                FileEncryptor.decryptFile(encryptedInputStream, decryptedOutputStream, secretKey);
+                System.out.println("File decrypted successfully at: " + decryptedClientFile.getAbsolutePath());
+            } catch (Exception e){
+                System.out.println("Error during file decryption: " + e.getMessage());
+            }
         } catch (IOException e){
+            e.printStackTrace();
+        } catch (Exception e){
             e.printStackTrace();
         }
 
     }
+
+    // Method to convert salt values into hex decimal strings
+    // This is called to output salt values to the terminal
+    private static String saltToHex(byte[] data) {
+
+        // Each byte is 2 hexadecimal characters
+        // StringBuilder holds the final hexadecimal string
+        StringBuilder hexString = new StringBuilder();
+
+        for(int i = 0; i < data.length; i++) {
+             hexString.append(String.format("%02x", data[i])); // Format each byte as 2 character hex
+        }
+        return hexString.toString(); // Convert StringBuilder to string type and return it
+    }
+
 
 }

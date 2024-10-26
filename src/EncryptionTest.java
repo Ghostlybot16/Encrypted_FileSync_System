@@ -2,6 +2,8 @@ import javax.crypto.SecretKey;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 
+import utilities.FileEncryptor;
+
 
 
 public class EncryptionTest {

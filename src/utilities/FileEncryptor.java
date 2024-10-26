@@ -9,7 +9,7 @@ import javax.crypto.SecretKeyFactory; // Used to generate a key from the passwor
 import javax.crypto.spec.PBEKeySpec; // Specification for password based encryption
 import java.security.SecureRandom; // Generates random salt (random value) for key generation
 
-// Salt = a random value
+// Salt = a random binary value
 
 public class FileEncryptor {
 
