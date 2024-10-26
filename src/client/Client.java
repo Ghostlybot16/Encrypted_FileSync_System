@@ -7,7 +7,6 @@ import java.util.Scanner;
 import utilities.FileEncryptor;
 import javax.crypto.SecretKey;
 
-
 public class Client {
 
     // serverIpAddress holds the IP address of the server which the client is going to connect to
@@ -22,7 +21,6 @@ public class Client {
         File resourcesDirectory = new File("../resources/"); // Path to resources directory
 
         File[] availableFiles = resourcesDirectory.listFiles(); // Create list of files in the directory
-
 
         if(availableFiles == null || availableFiles.length == 0){
             System.out.println("No files found in the resources directory."); // Output to the terminal if no files in directory
@@ -86,13 +84,12 @@ public class Client {
             return;
         }
 
-
         // Encrypt the file and save it in the encrypted_data directory
         File encryptedFile = new File(encryptedFolder, encryptedFileName);
         try(
                 InputStream inputFileStream = new FileInputStream(nameOfFile);
                 OutputStream encryptedOutputStream = new FileOutputStream(encryptedFile);
-                ) {
+        ) {
             // Encrypt the raw file by calling FileEncryptor
             FileEncryptor.encryptFile(inputFileStream, encryptedOutputStream, secretKey);
             System.out.println("File encrypted successfully as: " + encryptedFileName);
@@ -102,22 +99,36 @@ public class Client {
         }
 
         try(
-            // Connection to the server
+                // Connection to the server
+                // Connects to the server using the specified IP address and port number
+                Socket clientSocket = new Socket(serverIpAddress, serverPortNumber);
 
-            // Connects to the server using the specified IP address and port number
-            Socket clientSocket = new Socket(serverIpAddress, serverPortNumber);
+                // Reads data from the file that will be sent to the server
+                InputStream sourceFileStream = new FileInputStream(encryptedFile);
 
-            // Reads data from the file that will be sent to the server
-            InputStream sourceFileStream = new FileInputStream(encryptedFile);
+                DataInputStream serverDataInput = new DataInputStream(clientSocket.getInputStream());
 
-            // Sends data from the client to the server through the socket
-            // This stream is sending data from the client to the server
-            OutputStream clientToServerStream = clientSocket.getOutputStream();
+                // Sends data from the client to the server through the socket
+                // This stream is sending data from the client to the server
+                OutputStream clientToServerStream = clientSocket.getOutputStream();
 
-            // Stream used to send structured data to the server
-            // Wraps the socket output stream to send structured data like file name and file data
-            DataOutputStream outgoingDataStream = new DataOutputStream(clientToServerStream)
-        ){
+                // Stream used to send structured data to the server
+                // Wraps the socket output stream to send structured data like file name and file data
+                DataOutputStream outgoingDataStream = new DataOutputStream(clientToServerStream)
+        )
+        {
+            // Start a new thread to listen for updates from the server
+            new Thread(() -> {
+                try {
+                    while (true) {
+                        // Read updates from the server and print them to the console
+                        String update = serverDataInput.readUTF();
+                        System.out.println("Update from server: " + update);
+                    }
+                } catch (IOException e) {
+                    System.out.println("Connection to server disconnected.");
+                }
+            }).start();
 
             //  Send file name to the server
             outgoingDataStream.writeUTF(encryptedFile.getName());

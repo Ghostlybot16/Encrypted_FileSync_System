@@ -5,6 +5,8 @@ import java.net.ServerSocket; // Import used to create a server socket
 import java.net.Socket; // Import used to create client-server communication
 import javax.crypto.SecretKey;
 import utilities.FileEncryptor;
+
+import java.sql.Array;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.List;
@@ -24,6 +26,9 @@ public class Server {
     // Thread pool size
     // Number of threads to handle clients
     private static final int threadPoolSize = 4;
+
+    // List of connected clients to broadcast updates
+    private static final List<Socket> clients = new ArrayList<>();
 
     public static void main(String[] args) {
 
@@ -112,7 +117,7 @@ public class Server {
         @Override
         public void run() {
             try {
-                // Recieves file from client and decrypts it
+                // Receives file from client and decrypts it
                 receiveFileFromClientAndDecrypt(clientSocket);
                 clientSocket.close(); // Close socket after file transfer
 
@@ -133,7 +138,7 @@ public class Server {
                 // Wrap input stream so it's easier to read files
                 // dataStreamFromClient reads data from client
                 DataInputStream dataStreamFromClient = new DataInputStream(clientSocketInputStream)
-                ){
+        ){
 
             // Read the file name sent from the client
             // clientFileName stores the name of the file being transferred from the client
@@ -186,7 +191,7 @@ public class Server {
             try(
                     InputStream encryptedInputStream = new FileInputStream(destinationFileInServer);
                     OutputStream decryptedOutputStream = new FileOutputStream(decryptedClientFile);
-                    ){
+            ){
 
                 // Decrypting the file by calling FileEncryptor
                 FileEncryptor.decryptFile(encryptedInputStream, decryptedOutputStream, secretKey);
@@ -194,12 +199,53 @@ public class Server {
             } catch (Exception e){
                 System.out.println("Error during file decryption: " + e.getMessage());
             }
+
+            // Notify all connected clients about the new file
+            broadcastUpdate(decryptedFolderName);
+
         } catch (IOException e){
             e.printStackTrace();
         } catch (Exception e){
             e.printStackTrace();
         }
 
+    }
+
+    // Method to broadcast messages to all connected clients. It notifies all clients
+    private static void broadcastUpdate(String nameOfFile) {
+
+        // message to the client
+        String message = "New file available: " + nameOfFile;
+
+        // Notify client about update/message
+        synchronized (clients){
+
+            // Loop through each client in the client list
+            for (int i =0; i < clients.size(); i++){
+
+//                // Get client socket at index i
+//                Socket client = clients.get(i);
+//
+//                // PrintWriter  to send message to the client
+//                try(PrintWriter output = new PrintWriter(client.getOutputStream(), true)){
+//
+//                    // Message to client
+//                    output.println(message);
+//
+//                } catch (IOException e){
+//
+//                    // Error message
+//                    System.out.println("Failed to notify a client: " + e.getMessage());
+//                }
+                try{
+                    DataOutputStream out = new DataOutputStream(clients.get(i).getOutputStream());
+                    out.writeUTF(message);
+                    out.flush();
+                } catch(IOException e){
+                    System.out.println("Error sending update to client" + e.getMessage());
+                }
+            }
+        }
     }
 
     // Method to convert salt values into hex decimal strings
@@ -211,7 +257,7 @@ public class Server {
         StringBuilder hexString = new StringBuilder();
 
         for(int i = 0; i < data.length; i++) {
-             hexString.append(String.format("%02x", data[i])); // Format each byte as 2 character hex
+            hexString.append(String.format("%02x", data[i])); // Format each byte as 2 character hex
         }
         return hexString.toString(); // Convert StringBuilder to string type and return it
     }
