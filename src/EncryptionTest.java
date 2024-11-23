@@ -4,8 +4,6 @@ import java.io.FileOutputStream;
 
 import utilities.FileEncryptor;
 
-
-
 public class EncryptionTest {
     public static void main(String[] args) {
         try {

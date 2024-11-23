@@ -26,10 +26,10 @@ public class FileEncryptor {
         PBEKeySpec keySpec = new PBEKeySpec(password.toCharArray(), salt, ITERATIONS, keyLength);
 
         /*  SecretKeyFactory provides the functionality to convert key specifications into actual secret keys
-        *   which can be used to encrypt/decrypt.
-        *   It takes keySpec and uses it to generate a secretKey
-        *
-        *   Use PBKDF2 algorithm with HMAC-SHA256 hashing algorithm to generate a unique password */
+         *   which can be used to encrypt/decrypt.
+         *   It takes keySpec and uses it to generate a secretKey
+         *
+         *   Use PBKDF2 algorithm with HMAC-SHA256 hashing algorithm to generate a unique password */
         SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
 
         // Generates secretKey using the keySpec values of password, salt, iterations and key length
@@ -63,15 +63,15 @@ public class FileEncryptor {
         CipherOutputStream encryptedOutputStream = new CipherOutputStream(outputFileStream, encryptionCipher);
 
         /* dataBuffer is a temporary storage array that can hold up to 1024 bytes = 1KB of data at a time while
-        * reading and writing a file. This value can be changed. */
+         * reading and writing a file. This value can be changed. */
         byte[] dataBuffer = new byte[1024];
 
         // Variable to hold the number of bytes read
         int bytesRead;
 
         /*  inputFileStream.read(dataBuffer) reads up to 1024 bytes of data from the input stream into the buffer array
-        *   If there's data available then the buffer is filled up to 1024 bytes
-        *   If it reaches EOF then it returns -1, meaning there's no more data to read hence breaking the while loop */
+         *   If there's data available then the buffer is filled up to 1024 bytes
+         *   If it reaches EOF then it returns -1, meaning there's no more data to read hence breaking the while loop */
         while ((bytesRead = inputFileStream.read(dataBuffer)) != -1){
             encryptedOutputStream.write(dataBuffer, 0, bytesRead); // Writes the contents of the buffer to encryptedOutputStream (The encrypted output stream)
         }
@@ -95,11 +95,11 @@ public class FileEncryptor {
         int bytesRead;
 
         /*  Same logic as before,
-        *   A buffer array of 1024bytes is created to temporarily store data as it's being read from the input stream
-        *   decryptedInputStream.read(dataBuffer) reads encrypted data from the input stream, decrypts it and places the
-        *   decrypted data into the buffer.
-        *   If data is available, the decrypted data is filled up to 1024bytes
-        *   If it reaches EOF, then it returns -1, thus breaking the while loop*/
+         *   A buffer array of 1024bytes is created to temporarily store data as it's being read from the input stream
+         *   decryptedInputStream.read(dataBuffer) reads encrypted data from the input stream, decrypts it and places the
+         *   decrypted data into the buffer.
+         *   If data is available, the decrypted data is filled up to 1024bytes
+         *   If it reaches EOF, then it returns -1, thus breaking the while loop*/
         while((bytesRead = decryptedInputStream.read(dataBuffer)) != -1){
             outputFileStream.write(dataBuffer, 0, bytesRead);
         }

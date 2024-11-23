@@ -30,7 +30,7 @@ public class Client {
         // Print to the terminal the list of available files
         System.out.println("Available files to send to server:\n");
         for (File file : availableFiles) {
-            System.out.println("- " + file.getName()); // hyphen infront of each list item
+            System.out.println("- " + file.getName()); // hyphen in front of each list item
         }
 
         // Prompt user to enter the name of the file the needs to be sent to the server
@@ -74,7 +74,7 @@ public class Client {
             System.out.println("'encrypted_data' directory already exists at: " + encryptedFolder.getAbsolutePath());
         }
 
-        // Generate salt and create secretkey from password and salt
+        // Generate salt and create secret key from password and salt
         byte[] salt = FileEncryptor.createSalt();
         SecretKey secretKey;
         try{
@@ -100,20 +100,13 @@ public class Client {
 
         try(
                 // Connection to the server
-                // Connects to the server using the specified IP address and port number
                 Socket clientSocket = new Socket(serverIpAddress, serverPortNumber);
 
-                // Reads data from the file that will be sent to the server
                 InputStream sourceFileStream = new FileInputStream(encryptedFile);
 
                 DataInputStream serverDataInput = new DataInputStream(clientSocket.getInputStream());
 
-                // Sends data from the client to the server through the socket
-                // This stream is sending data from the client to the server
                 OutputStream clientToServerStream = clientSocket.getOutputStream();
-
-                // Stream used to send structured data to the server
-                // Wraps the socket output stream to send structured data like file name and file data
                 DataOutputStream outgoingDataStream = new DataOutputStream(clientToServerStream)
         )
         {
@@ -130,30 +123,40 @@ public class Client {
                 }
             }).start();
 
-            //  Send file name to the server
+            // Send file metadata
             outgoingDataStream.writeUTF(encryptedFile.getName());
-
-            //  Send salt length and the salt value itself
             outgoingDataStream.writeInt(salt.length);
             outgoingDataStream.write(salt);
-
-            //  Send user-input password to the server
             outgoingDataStream.writeUTF(userPassword);
 
-            // Send file data in chunks of 4KB
+            // File size to calculate progress
+            long fileSize = encryptedFile.length();
+            long bytesSent = 0;
+
             byte[] dataBuffer = new byte[4096]; // Buffer to store file data
-            int bytesRead; // Variable to store number of bytes read in each loop iteration
+            int bytesRead;
+
+            System.out.println("Uploading file to server...");
 
             while((bytesRead = sourceFileStream.read(dataBuffer)) != -1){
-                outgoingDataStream.write(dataBuffer, 0, bytesRead); // Write buffer content into the server
+                outgoingDataStream.write(dataBuffer, 0, bytesRead);
+                bytesSent += bytesRead;
+
+                // Calculate progress percentage
+                int progress = (int)((bytesSent * 100) / fileSize);
+
+                // Display progress bar
+                int barLength = 50; // Length of the progress bar
+                int filledBars = (progress * barLength) / 100; // Number of '=' characters
+                String progressBar = "=".repeat(filledBars) + " ".repeat(barLength - filledBars);
+
+                System.out.print("\r[" + progressBar + "] " + progress + "%");
             }
 
-            // Confirmation message sent to the terminal to communicate file transfer
-            System.out.println("Encrypted file sent: " + encryptedFile.getName());
+
+            System.out.println("\nFile upload complete.");
         } catch (IOException e){
             e.printStackTrace();
         }
-
     }
-
 }
