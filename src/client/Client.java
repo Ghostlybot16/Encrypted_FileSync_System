@@ -96,16 +96,25 @@ public class Client {
             int bytesRead;
 
             System.out.println("Uploading file to server...");
+            long startTime = System.nanoTime(); // Start timer
             while ((bytesRead = sourceFileStream.read(dataBuffer)) != -1) {
                 outgoingDataStream.write(dataBuffer, 0, bytesRead);
                 bytesSent += bytesRead;
 
+                // Calculate progress
                 int progress = (int) ((bytesSent * 100) / fileSize);
+
+                // Calculate speed in KB/s
+                long elapsedTime = System.nanoTime() - startTime; // time in nanoseconds
+                double elapsedTimeInSeconds = elapsedTime / 1e9; // convert to seconds
+                double speed = (bytesSent / 1024.0) / elapsedTimeInSeconds;
+
+                // Display progress bar with speed
                 int barLength = 50;
                 int filledBars = (progress * barLength) / 100;
                 String progressBar = "=".repeat(filledBars) + " ".repeat(barLength - filledBars);
 
-                System.out.print("\r[" + progressBar + "] " + progress + "%");
+                System.out.print(String.format("\r[%s] %d%% | Speed: %.2f KB/s", progressBar, progress, speed));
             }
             System.out.println("\nFile upload complete.");
         } catch (Exception e) {
