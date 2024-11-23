@@ -1,266 +1,103 @@
-package server; // Declares that this file is part of the 'server' package
+package server;
 
 import java.io.*;
-import java.net.ServerSocket; // Import used to create a server socket
-import java.net.Socket; // Import used to create client-server communication
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.security.MessageDigest;
 import javax.crypto.SecretKey;
 import utilities.FileEncryptor;
 
-import java.sql.Array;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ExecutorService;
-import java.util.List;
-import java.util.ArrayList;
 public class Server {
-
-    // Defines the port number that the server will listen on
-    // This is the port used by clients to connect
     private static final int serverListenPort = 55000;
-
-    // The directory where the received files sent by clients will be saved
     private static final String receivedFilesDir = "../received_files/";
-
-    // The directory where the decrypted files will be saved
     private static final String decryptedFolder = "../decrypted_data";
 
-    // Thread pool size
-    // Number of threads to handle clients
-    private static final int threadPoolSize = 4;
-
-    // List of connected clients to broadcast updates
-    private static final List<Socket> clients = new ArrayList<>();
-
     public static void main(String[] args) {
+        System.out.println("Server is active");
 
-        // Terminal output to communicate that the server is active
-        System.out.println("Server is active\n");
+        createDirectory(receivedFilesDir);
+        createDirectory(decryptedFolder);
 
-        try{
-            Thread.sleep(2000); // Delay for 2 seconds
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        // Calling a method to check if the directory for saving files from the client exists
-        directoryStatus(receivedFilesDir);
-
-        // Check to see if the directory that is storing the decrypted data exists
-        directoryStatus(decryptedFolder);
-
-        // Creates a fixed pool size of threads (4 threads)
-        ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
-
-        try{
-            Thread.sleep(2000); // Delay for 2 seconds
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        // Terminal output to communicate that the server socket is being created
-        System.out.println("Creating server socket...");
-
-        // Create a server socket that listens for connections in the mentioned port (55000)
-        try(ServerSocket serverSocket = new ServerSocket(serverListenPort)) {
-
-            // Terminal output to communicate that the server is active and waiting for a client to join
+        try (ServerSocket serverSocket = new ServerSocket(serverListenPort)) {
             System.out.println("Server is listening on port " + serverListenPort);
 
-            // Infinite loop to continuously listen for a client to join
-            while(true){
-                Socket clientSocket = serverSocket.accept(); // Accept the client
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
                 System.out.println("Client connected.");
-
-                // Calling ClientHandler instance to the threadPool
-                // The thread pool will handle the execution of ClientHandler, hence allowing the server to accept new clients
-                threadPool.execute(new ClientHandler(clientSocket));
+                new Thread(() -> handleClient(clientSocket)).start();
             }
-        } catch (IOException e){
+        } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            threadPool.shutdown(); // Shutdown thread pool when server stops
         }
     }
 
+    private static void handleClient(Socket clientSocket) {
+        try (
+                DataInputStream dataStreamFromClient = new DataInputStream(clientSocket.getInputStream())
+        ) {
+            String clientChecksum = dataStreamFromClient.readUTF();
+            System.out.println("Checksum received from client: " + clientChecksum);
 
-    private static void directoryStatus(String directoryPath) {
-
-        // Create a file object that represents the path to the directory
-        File directory = new File(directoryPath);
-
-        // Checking to see if the directory to store data from the client
-        if(!directory.exists()){
-            if(directory.mkdirs()) {    // Attempts to create the directory
-
-                // Outputs path if directory gets created
-                System.out.println("Directory created successfully at: " + directory.getAbsolutePath());
-
-            }
-            else{
-                // Error message if directory fails to create
-                System.out.println("Failed to create directory at: " + directory.getAbsolutePath());
-            }
-        } else {
-            System.out.println("Directory already exists at: " + directory.getAbsolutePath());
-        }
-    }
-
-    // Client Handler to handle client connection
-    // Implementing Runnable allows each instance to be run in a separate thread
-    private static class ClientHandler implements Runnable {
-        private final Socket clientSocket;
-
-        public ClientHandler(Socket clientSocket){
-            this.clientSocket = clientSocket;
-        }
-
-        // Method called when thread starts
-        @Override
-        public void run() {
-            try {
-                // Receives file from client and decrypts it
-                receiveFileFromClientAndDecrypt(clientSocket);
-                clientSocket.close(); // Close socket after file transfer
-
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-    }
-
-    private static void receiveFileFromClientAndDecrypt(Socket clientSocket) {
-
-        // try with resources block to automatically close the input stream once it's done being used
-        try(
-                // Retrieves the input stream from client socket in order to allow the server to read data sent by client
-                InputStream clientSocketInputStream = clientSocket.getInputStream();
-
-                // Wrap input stream so it's easier to read files
-                // dataStreamFromClient reads data from client
-                DataInputStream dataStreamFromClient = new DataInputStream(clientSocketInputStream)
-        ){
-
-            // Read the file name sent from the client
-            // clientFileName stores the name of the file being transferred from the client
             String encryptedClientFileName = dataStreamFromClient.readUTF();
-
-            //  Receive salt length and salt value from client
             int saltLength = dataStreamFromClient.readInt();
-            byte[] salt = new byte[saltLength]; // Byte array to store the salt value
+            byte[] salt = new byte[saltLength];
             dataStreamFromClient.readFully(salt);
-
-            // Read the password that the client used for encryption
             String password = dataStreamFromClient.readUTF();
 
-            // Output to the terminal to communicate that the FileName and Password sent by the client has been received by the server
-            System.out.println("Received password from client: " + password);
-            System.out.println("Received encrypted file name: " + encryptedClientFileName);
-            System.out.println("Received salt value: " + saltToHex(salt));
-
-            // Creates a file object that shows where the data from client will be saved within the server
-            // The file will be stored in receivedFilesDir location with its filename
-            File destinationFileInServer = new File(receivedFilesDir + encryptedClientFileName);
-
-
-            // fileOutputStream handles writing the data to the file in the server
-            try(FileOutputStream fileOutputStream = new FileOutputStream(destinationFileInServer)) {
-
-                // Buffer of 4KB size to read from client file
+            File destinationFile = new File(receivedFilesDir + encryptedClientFileName);
+            try (FileOutputStream fileOutputStream = new FileOutputStream(destinationFile)) {
                 byte[] dataBuffer = new byte[4096];
                 int bytesRead;
-
-                while((bytesRead = dataStreamFromClient.read(dataBuffer)) != -1){
-
-                    // Write the content inside the buffer to the server storage
+                while ((bytesRead = dataStreamFromClient.read(dataBuffer)) != -1) {
                     fileOutputStream.write(dataBuffer, 0, bytesRead);
                 }
-
-                // Outputs a confirmation message to the terminal that the process has been executed successfully
-                System.out.println("Encrypted file received and saved at: " + destinationFileInServer.getAbsolutePath());
             }
 
-            // Creation of secretKey using the received password and salt from client
-            // Essentially the secretkey generated in the server should match the secretkey generated in the client
-            SecretKey secretKey = FileEncryptor.KeyGenFromPassword(password,salt);
+            SecretKey secretKey = FileEncryptor.KeyGenFromPassword(password, salt);
+            File decryptedFile = new File(decryptedFolder, "decrypted_" + encryptedClientFileName);
 
-            // Creating a decrypted file directory
-            String decryptedFolderName = "decrypted_" + encryptedClientFileName;
-
-            // Decrypt the file and save it to the 'decrypted_data' directory
-            File decryptedClientFile = new File(decryptedFolder, decryptedFolderName);
-            try(
-                    InputStream encryptedInputStream = new FileInputStream(destinationFileInServer);
-                    OutputStream decryptedOutputStream = new FileOutputStream(decryptedClientFile);
-            ){
-
-                // Decrypting the file by calling FileEncryptor
+            try (
+                    InputStream encryptedInputStream = new FileInputStream(destinationFile);
+                    OutputStream decryptedOutputStream = new FileOutputStream(decryptedFile)
+            ) {
                 FileEncryptor.decryptFile(encryptedInputStream, decryptedOutputStream, secretKey);
-                System.out.println("File decrypted successfully at: " + decryptedClientFile.getAbsolutePath());
-            } catch (Exception e){
-                System.out.println("Error during file decryption: " + e.getMessage());
+                System.out.println("File decrypted successfully at: " + decryptedFile.getAbsolutePath());
             }
 
-            // Notify all connected clients about the new file
-            broadcastUpdate(decryptedFolderName);
+            String decryptedChecksum = calculateChecksum(decryptedFile);
+            System.out.println("Checksum of decrypted file: " + decryptedChecksum);
 
-        } catch (IOException e){
-            e.printStackTrace();
-        } catch (Exception e){
+            if (clientChecksum.equals(decryptedChecksum)) {
+                System.out.println("File integrity verified: Checksums match!");
+            } else {
+                System.out.println("File integrity check failed: Checksums do not match!");
+            }
+        } catch (Exception e) {
             e.printStackTrace();
         }
-
     }
 
-    // Method to broadcast messages to all connected clients. It notifies all clients
-    private static void broadcastUpdate(String nameOfFile) {
-
-        // message to the client
-        String message = "New file available: " + nameOfFile;
-
-        // Notify client about update/message
-        synchronized (clients){
-
-            // Loop through each client in the client list
-            for (int i =0; i < clients.size(); i++){
-
-//                // Get client socket at index i
-//                Socket client = clients.get(i);
-//
-//                // PrintWriter  to send message to the client
-//                try(PrintWriter output = new PrintWriter(client.getOutputStream(), true)){
-//
-//                    // Message to client
-//                    output.println(message);
-//
-//                } catch (IOException e){
-//
-//                    // Error message
-//                    System.out.println("Failed to notify a client: " + e.getMessage());
-//                }
-                try{
-                    DataOutputStream out = new DataOutputStream(clients.get(i).getOutputStream());
-                    out.writeUTF(message);
-                    out.flush();
-                } catch(IOException e){
-                    System.out.println("Error sending update to client" + e.getMessage());
-                }
+    private static String calculateChecksum(File file) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        try (InputStream fis = new FileInputStream(file)) {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                digest.update(buffer, 0, bytesRead);
             }
         }
-    }
-
-    // Method to convert salt values into hex decimal strings
-    // This is called to output salt values to the terminal
-    private static String saltToHex(byte[] data) {
-
-        // Each byte is 2 hexadecimal characters
-        // StringBuilder holds the final hexadecimal string
-        StringBuilder hexString = new StringBuilder();
-
-        for(int i = 0; i < data.length; i++) {
-            hexString.append(String.format("%02x", data[i])); // Format each byte as 2 character hex
+        byte[] checksumBytes = digest.digest();
+        StringBuilder checksum = new StringBuilder();
+        for (byte b : checksumBytes) {
+            checksum.append(String.format("%02x", b));
         }
-        return hexString.toString(); // Convert StringBuilder to string type and return it
+        return checksum.toString();
     }
 
-
+    private static void createDirectory(String directoryPath) {
+        File directory = new File(directoryPath);
+        if (!directory.exists() && directory.mkdirs()) {
+            System.out.println("Directory created at: " + directoryPath);
+        }
+    }
 }
