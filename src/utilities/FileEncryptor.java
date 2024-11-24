@@ -9,6 +9,7 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 
 public class FileEncryptor {
@@ -92,4 +93,16 @@ public class FileEncryptor {
         }
         decryptedInputStream.close();
     }
+
+    // Calculate the checksum of a byte array
+    public static String calculateChecksum(byte[] data) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] checksumBytes = digest.digest(data);
+        StringBuilder checksum = new StringBuilder();
+        for (byte b : checksumBytes) {
+            checksum.append(String.format("%02x", b));
+        }
+        return checksum.toString();
+    }
+
 }

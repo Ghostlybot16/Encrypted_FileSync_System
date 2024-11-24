@@ -140,7 +140,8 @@ public class Client {
 
             // Send metadata and encrypted data to the server
             byte[] encryptedData = readFileAsBytes(encryptedFile);
-            String response = service.sendFile(fileName, encryptedData, password, salt, iv);
+            String originalFileChecksum = FileEncryptor.calculateChecksum(fileData);
+            String response = service.sendFile(fileName, encryptedData, password, salt, iv, originalFileChecksum);
             System.out.println("Server Response: " + response);
 
         } catch (Exception e) {
