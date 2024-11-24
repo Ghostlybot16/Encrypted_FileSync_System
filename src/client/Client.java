@@ -1,27 +1,28 @@
 package client;
 
-import java.io.*;
-import java.net.Socket;
-import java.security.MessageDigest;
-import java.util.Scanner;
-import javax.crypto.SecretKey;
-
+import rmi.DistributedFileService;
 import utilities.FileEncryptor;
 
+import javax.crypto.SecretKey;
+import java.io.*;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.util.Scanner;
+
 public class Client {
-    private static final String serverIpAddress = "127.0.0.1";
-    private static final int serverPortNumber = 55000;
-
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
+        try {
+            // Connect to the RMI Registry on localhost and port 1099
+            Registry registry = LocateRegistry.getRegistry("localhost", 1099);
 
-        try (Socket clientSocket = new Socket(serverIpAddress, serverPortNumber);
-             DataOutputStream outgoingDataStream = new DataOutputStream(clientSocket.getOutputStream());
-             DataInputStream incomingDataStream = new DataInputStream(clientSocket.getInputStream())) {
+            // Lookup the DistributedFileService in the registry
+            DistributedFileService service = (DistributedFileService) registry.lookup("DistributedFileService");
 
-            boolean continueConnection = true;
+            Scanner scanner = new Scanner(System.in);
 
-            while (continueConnection) {
+            boolean keepRunning = true;
+
+            while (keepRunning) {
                 System.out.println("\nOptions:");
                 System.out.println("1. Send a file");
                 System.out.println("2. Terminate connection");
@@ -30,150 +31,125 @@ public class Client {
 
                 switch (choice) {
                     case "1":
-                        outgoingDataStream.writeUTF("SEND"); // Notify server about file transfer
-                        sendFileToServer(scanner, outgoingDataStream, incomingDataStream);
+                        sendFile(scanner, service);
                         break;
+
                     case "2":
-                        outgoingDataStream.writeUTF("TERMINATE"); // Notify server about termination
-                        System.out.println("Terminating connection to the server...");
-                        String serverResponse = incomingDataStream.readUTF();
-                        System.out.println("Server: " + serverResponse);
-                        continueConnection = false;
+                        // Terminate connection
+                        System.out.println("Terminating connection...");
+                        String terminationResponse = service.terminateConnection();
+                        System.out.println("Server response: " + terminationResponse);
+                        keepRunning = false;
                         break;
+
                     default:
-                        System.out.println("Invalid input. Please enter 1 or 2.");
+                        System.out.println("Invalid input. Please try again.");
                 }
             }
 
+            System.out.println("Client has disconnected.");
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-        System.out.println("Client has disconnected.");
     }
 
-    private static void sendFileToServer(Scanner scanner, DataOutputStream outgoingDataStream, DataInputStream incomingDataStream) {
+    private static void sendFile(Scanner scanner, DistributedFileService service) {
         try {
+            // List files in the resources directory
             File resourcesDirectory = new File("../resources/");
             File[] availableFiles = resourcesDirectory.listFiles();
 
             if (availableFiles == null || availableFiles.length == 0) {
                 System.out.println("No files found in the resources directory.");
-                return; // Ensure the return only exits this method, not the program.
+                return;
             }
 
-            System.out.println("Available files to send to server:\n");
+            System.out.println("Available files to send to server:");
             for (File file : availableFiles) {
                 System.out.println("- " + file.getName());
             }
 
-            System.out.println("Enter the name of the file you want to send:");
-            String userInputForFileName = scanner.nextLine();
-            File nameOfFile = new File(resourcesDirectory, userInputForFileName);
+            System.out.print("Enter the name of the file to send: ");
+            String fileName = scanner.nextLine();
+            File fileToSend = new File(resourcesDirectory, fileName);
 
-            if (!nameOfFile.exists() || !nameOfFile.isFile()) {
-                System.out.println("File not found in directory.");
-                return; // Same here: ensure this just exits the method.
-            }
-
-            System.out.println("Chosen file to encrypt: " + nameOfFile.getName());
-            System.out.println("\nEnter a password for encryption:");
-            String userPassword = scanner.nextLine();
-
-            String encryptedFileName = "encrypted_" + nameOfFile.getName();
-            File encryptedFolder = new File("../encrypted_data");
-
-            if (!encryptedFolder.exists() && !encryptedFolder.mkdirs()) {
-                System.out.println("Failed to create 'encrypted_data' directory.");
+            if (!fileToSend.exists() || !fileToSend.isFile()) {
+                System.out.println("File not found.");
                 return;
             }
 
+            System.out.print("Enter a password for encryption: ");
+            String password = scanner.nextLine();
+
+            // Read the file content
+            byte[] fileData = readFileAsBytes(fileToSend);
             byte[] salt = FileEncryptor.createSalt();
-            SecretKey secretKey;
-            try {
-                secretKey = FileEncryptor.KeyGenFromPassword(userPassword, salt);
-            } catch (Exception e) {
-                System.out.println("Error generating secret key: " + e.getMessage());
-                return;
+            SecretKey secretKey = FileEncryptor.KeyGenFromPassword(password, salt);
+
+            // Create the encrypted_data directory if it doesn't exist
+            File encryptedDataDir = new File("../encrypted_data/");
+            if (!encryptedDataDir.exists() && encryptedDataDir.mkdirs()) {
+                System.out.println("Created directory: " + encryptedDataDir.getAbsolutePath());
             }
 
-            File encryptedFile = new File(encryptedFolder, encryptedFileName);
-            try (
-                    InputStream inputFileStream = new FileInputStream(nameOfFile);
-                    OutputStream encryptedOutputStream = new FileOutputStream(encryptedFile)
-            ) {
-                FileEncryptor.encryptFile(inputFileStream, encryptedOutputStream, secretKey);
-                System.out.println("File encrypted successfully as: " + encryptedFileName);
-            } catch (Exception e) {
-                System.out.println("Error encrypting file: " + e.getMessage());
-                return;
+            // Save the encrypted file to the encrypted_data folder
+            File encryptedFile = new File(encryptedDataDir, "encrypted_" + fileName);
+            byte[] iv;
+            try (FileOutputStream encryptedFileOutput = new FileOutputStream(encryptedFile)) {
+                iv = FileEncryptor.encryptFile(new ByteArrayInputStream(fileData), encryptedFileOutput, secretKey);
             }
+            System.out.println("Encrypted file saved at: " + encryptedFile.getAbsolutePath());
 
-            try (
-                    InputStream sourceFileStream = new FileInputStream(encryptedFile)
-            ) {
-                String checksum = calculateChecksum(nameOfFile);
-                System.out.println("Checksum of original file: " + checksum);
-                outgoingDataStream.writeUTF(checksum);
-
-                outgoingDataStream.writeUTF(encryptedFile.getName());
-                outgoingDataStream.writeInt(salt.length);
-                outgoingDataStream.write(salt);
-                outgoingDataStream.writeUTF(userPassword);
-
-                long fileSize = encryptedFile.length();
-                outgoingDataStream.writeLong(fileSize); // Send file size to server
-
-                long bytesSent = 0;
-                byte[] dataBuffer = new byte[4096];
+            // Send the encrypted file to the server with progress bar and speed
+            long fileSize = encryptedFile.length();
+            try (FileInputStream fileInputStream = new FileInputStream(encryptedFile)) {
+                byte[] buffer = new byte[4096];
                 int bytesRead;
-
-                System.out.println("Uploading file to server...");
+                long bytesSent = 0;
                 long startTime = System.nanoTime();
-                while ((bytesRead = sourceFileStream.read(dataBuffer)) != -1) {
-                    outgoingDataStream.write(dataBuffer, 0, bytesRead);
+
+                System.out.println("Sending file to the server...");
+                while ((bytesRead = fileInputStream.read(buffer)) != -1) {
+                    // Simulate sending chunks (you could use a chunked transfer if needed)
                     bytesSent += bytesRead;
 
+                    // Calculate progress
                     int progress = (int) ((bytesSent * 100) / fileSize);
-                    long elapsedTime = System.nanoTime() - startTime;
-                    double elapsedTimeInSeconds = elapsedTime / 1e9;
-                    double speed = (bytesSent / 1024.0) / elapsedTimeInSeconds;
 
+                    // Calculate speed
+                    long elapsedTime = System.nanoTime() - startTime;
+                    double elapsedSeconds = elapsedTime / 1e9;
+                    double speed = (bytesSent / 1024.0) / elapsedSeconds; // Speed in KB/s
+
+                    // Display progress bar
                     int barLength = 50;
                     int filledBars = (progress * barLength) / 100;
                     String progressBar = "=".repeat(filledBars) + " ".repeat(barLength - filledBars);
 
                     System.out.print(String.format("\r[%s] %d%% | Speed: %.2f KB/s", progressBar, progress, speed));
                 }
-                System.out.println("\nFile upload complete.");
-
-                String serverResponse = incomingDataStream.readUTF(); // Read server's response
-                System.out.println("Server: " + serverResponse);
-            } catch (Exception e) {
-                System.out.println("Error during file upload: " + e.getMessage());
+                System.out.println("\nFile transfer complete.");
             }
 
-            System.out.println("Returning to main menu...");
+            // Send metadata and encrypted data to the server
+            byte[] encryptedData = readFileAsBytes(encryptedFile);
+            String response = service.sendFile(fileName, encryptedData, password, salt, iv);
+            System.out.println("Server Response: " + response);
+
         } catch (Exception e) {
-            System.out.println("An error occurred: " + e.getMessage());
+            System.out.println("Error: " + e.getMessage());
         }
     }
 
-
-    private static String calculateChecksum(File file) throws Exception {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        try (InputStream fis = new FileInputStream(file)) {
+    private static byte[] readFileAsBytes(File file) throws IOException {
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+             FileInputStream inputStream = new FileInputStream(file)) {
             byte[] buffer = new byte[4096];
             int bytesRead;
-            while ((bytesRead = fis.read(buffer)) != -1) {
-                digest.update(buffer, 0, bytesRead);
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
             }
+            return outputStream.toByteArray();
         }
-        byte[] checksumBytes = digest.digest();
-        StringBuilder checksum = new StringBuilder();
-        for (byte b : checksumBytes) {
-            checksum.append(String.format("%02x", b));
-        }
-        return checksum.toString();
     }
 }
