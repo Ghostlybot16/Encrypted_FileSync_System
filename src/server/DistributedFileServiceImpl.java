@@ -6,8 +6,7 @@ import utilities.FileEncryptor;
 import javax.crypto.SecretKey;
 import java.io.*;
 import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
+import java.rmi.server.RemoteServer;
 import java.rmi.server.UnicastRemoteObject;
 
 public class DistributedFileServiceImpl extends UnicastRemoteObject implements DistributedFileService {
@@ -24,6 +23,9 @@ public class DistributedFileServiceImpl extends UnicastRemoteObject implements D
     @Override
     public String sendFile(String fileName, byte[] fileData, String password, byte[] salt, byte[] iv) throws RemoteException {
         try {
+            // Log client connection details
+            System.out.println("***Client Connected***");
+
             File destinationFile = new File(receivedFilesDir, fileName);
 
             // Log the password, salt, and IV received from the client
@@ -56,24 +58,22 @@ public class DistributedFileServiceImpl extends UnicastRemoteObject implements D
 
     @Override
     public String terminateConnection() throws RemoteException {
+        System.out.println("***Client Disconnected***");
         return "Connection terminated.";
     }
 
     @Override
     public String checkIntegrity(String originalChecksum, byte[] fileData) throws RemoteException {
-        // Optional: Implement checksum verification
         return "Integrity check not implemented yet.";
     }
 
     @Override
     public byte[] encryptFile(byte[] fileData, String password, byte[] salt) throws RemoteException {
-        // Optional: Implement encryption logic
         return new byte[0];
     }
 
     @Override
     public byte[] decryptFile(byte[] encryptedData, String password, byte[] salt) throws RemoteException {
-        // Optional: Implement decryption logic
         return new byte[0];
     }
 
@@ -91,21 +91,5 @@ public class DistributedFileServiceImpl extends UnicastRemoteObject implements D
             hexString.append(String.format("%02x", b));
         }
         return hexString.toString();
-    }
-
-    public static void main(String[] args) {
-        try {
-            // Create the service implementation
-            DistributedFileService service = new DistributedFileServiceImpl();
-
-            // Start RMI Registry on port 1099
-            Registry registry = LocateRegistry.createRegistry(1099);
-
-            // Bind the service to the RMI registry
-            registry.rebind("DistributedFileService", service);
-            System.out.println("RMI Server is running and waiting for client requests...");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 }

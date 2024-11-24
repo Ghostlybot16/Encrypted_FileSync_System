@@ -7,16 +7,24 @@ import javax.crypto.SecretKey;
 import java.io.*;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.net.InetAddress;
 import java.util.Scanner;
 
 public class Client {
     public static void main(String[] args) {
         try {
-            // Connect to the RMI Registry on localhost and port 1099
-            Registry registry = LocateRegistry.getRegistry("localhost", 1099);
+            // Server details
+            String serverAddress = "localhost";
+            int serverPort = 1099;
+
+            // Connect to the RMI Registry
+            Registry registry = LocateRegistry.getRegistry(serverAddress, serverPort);
 
             // Lookup the DistributedFileService in the registry
             DistributedFileService service = (DistributedFileService) registry.lookup("DistributedFileService");
+
+            // Print connection message
+            System.out.println("Connected to FileTransferServer @ (" + serverAddress + ", " + serverPort + ")");
 
             Scanner scanner = new Scanner(System.in);
 
@@ -35,7 +43,6 @@ public class Client {
                         break;
 
                     case "2":
-                        // Terminate connection
                         System.out.println("Terminating connection...");
                         String terminationResponse = service.terminateConnection();
                         System.out.println("Server response: " + terminationResponse);
@@ -100,7 +107,7 @@ public class Client {
             }
             System.out.println("Encrypted file saved at: " + encryptedFile.getAbsolutePath());
 
-            // Send the encrypted file to the server with progress bar and speed
+            // Send the encrypted file to the server with progress bar and speed measurement
             long fileSize = encryptedFile.length();
             try (FileInputStream fileInputStream = new FileInputStream(encryptedFile)) {
                 byte[] buffer = new byte[4096];
@@ -110,7 +117,7 @@ public class Client {
 
                 System.out.println("Sending file to the server...");
                 while ((bytesRead = fileInputStream.read(buffer)) != -1) {
-                    // Simulate sending chunks (you could use a chunked transfer if needed)
+                    // Simulate sending chunks
                     bytesSent += bytesRead;
 
                     // Calculate progress
