@@ -1,8 +1,5 @@
 # Encrypted File Transfer Program
 
-Student Name: Kramptj KC\
-Student ID: 100787909 
-
 This application is a Java-based encrypted file transfer system that allows clients to safely upload files to a server. 
 After the server receives the file, it decrypts the file and stores it. This project supoorts real time notifications for transfer
 completion and uses multithreaded handling for simultaneous client connections. This project showcases a secure client-server 
