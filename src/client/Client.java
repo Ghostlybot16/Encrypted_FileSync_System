@@ -2,11 +2,11 @@ package client;
 
 import java.io.*;
 import java.net.Socket;
-import java.security.MessageDigest;
 import java.util.Scanner;
 import javax.crypto.SecretKey;
 
 import utilities.FileEncryptor;
+import utilities.ChecksumUtil;
 
 /**
  * Client-side program for connecting to a file transfer server
@@ -99,7 +99,7 @@ public class Client {
      * - Generates a salt and secret key.
      * - Encrypts the selected file.
      * - Calculates the checksum of the original file.
-     * - Sends the checksum, encrypted file nam, salt, password, file size,
+     * - Sends the checksum, encrypted file name, salt, password, file size,
      *   and encrypted file content to the server.
      * - Displays upload progress and speed.
      *
@@ -181,7 +181,7 @@ public class Client {
             try (InputStream sourceFileStream = new FileInputStream(encryptedFile)) {
 
                 // Calculate checksum of the original file before encryption.
-                String checksum = calculateChecksum(nameOfFile);
+                String checksum = ChecksumUtil.calculateChecksum(nameOfFile);
                 System.out.println("Checksum of original file: " + checksum);
 
                 // Send metadata required by the server.
@@ -242,38 +242,5 @@ public class Client {
         } catch (Exception e) {
             System.out.println("An error occurred: " + e.getMessage());
         }
-    }
-
-    /**
-     * Calculates the SHA-256 checksum of a file.
-     *
-     * A checksum is a unique hash value generated from the file contents.
-     * It can be used to verify whether the file was changed, corrupted, or
-     * transferred incorrectly.
-     *
-     * @param file The file whose checksum should be calculated.
-     * @return the SHA-256 checksum as a hexadecimal string.
-     * @throws Exception if the SHA-256 algorithm is unavailable or the file cannot be read.
-     */
-    private static String calculateChecksum(File file) throws Exception {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-
-        try (InputStream fis = new FileInputStream(file)) {
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-
-            while ((bytesRead = fis.read(buffer)) != -1) {
-                digest.update(buffer, 0, bytesRead);
-            }
-        }
-
-        byte[] checksumBytes = digest.digest();
-        StringBuilder checksum = new StringBuilder();
-
-        for (byte b : checksumBytes) {
-            checksum.append(String.format("%02x", b));
-        }
-
-        return checksum.toString();
     }
 }

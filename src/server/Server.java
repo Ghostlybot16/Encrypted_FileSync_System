@@ -3,10 +3,10 @@ package server;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.security.MessageDigest;
 import javax.crypto.SecretKey;
 
 import utilities.FileEncryptor;
+import utilities.ChecksumUtil;
 
 /**
  * Server-side program responsible for:
@@ -38,7 +38,7 @@ public class Server {
      * - Continuously listens for client connections.
      * - Creates a new thread for each connected client.
      *
-     * @param args command-line arguements, not used in this program
+     * @param args command-line arguments, not used in this program
      */
     public static void main(String[] args) {
 
@@ -52,7 +52,7 @@ public class Server {
 
             System.out.println("Server is listening on port " + serverListenPort);
 
-            // Keep accepting client connections indefinetly.
+            // Keep accepting client connections indefinitly.
             while (true) {
 
                 Socket clientSocket = serverSocket.accept();
@@ -209,7 +209,7 @@ public class Server {
         // Create decrypted output file.
         File decryptedFile = new File(decryptedFolder, "decrypted_" + encryptedClientFileName);
 
-        // Decrypt received enrypted file.
+        // Decrypt received encrypted file.
         try (
                 InputStream encryptedInputStream = new FileInputStream(destinationFile);
                 OutputStream decryptedOutputStream = new FileOutputStream(decryptedFile)
@@ -224,7 +224,7 @@ public class Server {
         }
 
         // Calculate the checksum of decrypted file
-        String decryptedChecksum = calculateChecksum(decryptedFile);
+        String decryptedChecksum = ChecksumUtil.calculateChecksum(decryptedFile);
         System.out.println("Checksum of decrypted file: " + decryptedChecksum);
 
         // Compare original checksum with decrypted checksum.
@@ -235,41 +235,6 @@ public class Server {
             System.out.println("File integrity check failed: Checksums do not match!");
             dataStreamToClient.writeUTF("Checksum verification failed: Files do not match!");
         }
-    }
-
-    /**
-     * Calculates the SHA-256 checksum of a file.
-     *
-     * A checksum is used to verify data integrity and ensure the
-     * file contents were not modified or corrupted.
-     *
-     * @param file file whose checksum should be calculated.
-     * @return SHA-256 checksum represented as a hexadecimal string.
-     * @throws Exception if the file cannot be read or hashing fails.
-     */
-    private static String calculateChecksum(File file) throws Exception {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-
-        try (InputStream fis = new FileInputStream(file)) {
-
-            byte[] buffer = new byte[4096];
-
-            int bytesRead;
-
-            while ((bytesRead = fis.read(buffer)) != -1) {
-
-                digest.update(buffer, 0, bytesRead);
-            }
-        }
-        byte[] checksumBytes = digest.digest();
-
-        StringBuilder checksum = new StringBuilder();
-
-        for (byte b : checksumBytes) {
-
-            checksum.append(String.format("%02x", b));
-        }
-        return checksum.toString();
     }
 
     /**
