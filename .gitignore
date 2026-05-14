@@ -35,3 +35,13 @@ bin/
 .name
 .idea/*
 
+#Ignore compiled .class files
+src/*.class
+src/client/Client.class
+src/server/Server.class
+
+#Ignore encrypted/decrypted and received files directory
+decrypted_data/
+encrypted_data/
+received_files/
+
