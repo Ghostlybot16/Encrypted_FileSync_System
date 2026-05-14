@@ -1,3 +1,0 @@
-Hello, this is a test file for encryption.
-Numbers: 1234567890
-Symbols: !@#$%^&*()_+[]{}|;':",./<>?
