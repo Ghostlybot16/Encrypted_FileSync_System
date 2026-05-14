@@ -33,4 +33,5 @@ bin/
 ./Encrypted_FileSync_System.iml
 .idea/*.xml
 .name
+.idea/*
 

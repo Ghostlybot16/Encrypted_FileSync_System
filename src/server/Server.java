@@ -5,50 +5,115 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.MessageDigest;
 import javax.crypto.SecretKey;
+
 import utilities.FileEncryptor;
 
+/**
+ * Server-side program responsible for:
+ * - Listening for incoming client connection.
+ * - Receiving encrypted files from clients.
+ * - Decrypting received files.
+ * - Verifying file integrity using SHA-256 checksums.
+ * - Handling client commands such as SEND and TERMINATE.
+ */
+
 public class Server {
+
+    // Port number the server listens on for client connections.
     private static final int serverListenPort = 55000;
+
+    // Directory where encrypted files received from clients are stored
     private static final String receivedFilesDir = "../received_files/";
+
+    // Directory where decrypted versions of received files are stored.
     private static final String decryptedFolder = "../decrypted_data/";
 
+
+    /**
+     * Main entry point of the server application.
+     *
+     * This method:
+     * - Creates required directories if they do not already exist.
+     * - Starts the server socket.
+     * - Continuously listens for client connections.
+     * - Creates a new thread for each connected client.
+     *
+     * @param args command-line arguements, not used in this program
+     */
     public static void main(String[] args) {
+
         System.out.println("Server is active");
 
+        // Ensure required directories exist before receiving files.
         createDirectory(receivedFilesDir);
         createDirectory(decryptedFolder);
 
         try (ServerSocket serverSocket = new ServerSocket(serverListenPort)) {
+
             System.out.println("Server is listening on port " + serverListenPort);
 
+            // Keep accepting client connections indefinetly.
             while (true) {
+
                 Socket clientSocket = serverSocket.accept();
+
                 System.out.println("Client connected.");
+
+                // Handle each client in a separate thread so multiple clients can connect simultaneously.
                 new Thread(() -> handleClient(clientSocket)).start();
             }
+
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * Handles communication between the server and a connected client.
+     *
+     * This method:
+     * - Reads commands sent by the client.
+     * - Processes SEND requests for file transfers.
+     * - Processes TERMINATE requests to close the connection
+     *
+     * @param clientSocket socket connected to the client
+     */
     private static void handleClient(Socket clientSocket) {
+
         try (
-                DataInputStream dataStreamFromClient = new DataInputStream(clientSocket.getInputStream());
-                DataOutputStream dataStreamToClient = new DataOutputStream(clientSocket.getOutputStream())
+                DataInputStream dataStreamFromClient =
+                        new DataInputStream(clientSocket.getInputStream());
+
+                DataOutputStream dataStreamToClient =
+                        new DataOutputStream(clientSocket.getOutputStream())
         ) {
             boolean keepRunning = true;
 
             while (keepRunning) {
+
+                // Read command sent by the client.
                 String command = dataStreamFromClient.readUTF();
 
+
                 if ("TERMINATE".equalsIgnoreCase(command)) {
+
                     System.out.println("Client requested termination.");
+
                     keepRunning = false;
+
                     dataStreamToClient.writeUTF("Connection terminated by server.");
+
                 } else if ("SEND".equalsIgnoreCase(command)) {
+
                     System.out.println("Processing file transfer...");
-                    handleFileTransfer(dataStreamFromClient, dataStreamToClient);
+
+                    handleFileTransfer(
+                            dataStreamFromClient,
+                            dataStreamToClient
+                    );
                 } else {
+
+                    // Handle invalid or unknown commands.
                     dataStreamToClient.writeUTF("Unknown command.");
                 }
             }
@@ -57,28 +122,58 @@ public class Server {
         }
     }
 
-    private static void handleFileTransfer(DataInputStream dataStreamFromClient, DataOutputStream dataStreamToClient) throws Exception {
+
+    /**
+     * Handles the complete encrypted file transfer process.
+     *
+     * This method:
+     * - Receives checksum information from the client.
+     * - Receives encryption metadata (salt and password).
+     * - Receives the encrypted file contents.
+     * - Saves the encrypted file locally.
+     * - Decrypts the received file.
+     * - Calculates checksum of the decrypted file.
+     * - Compares checksums to verify file integrity.
+     *
+     * @param dataStreamFromClient input stream used to receive data from the client.
+     * @param dataStreamToClient output stream used to send responses to the client.
+     * @throws Exception if an error occurs during file transfer or decryption.
+     */
+    private static void handleFileTransfer(
+            DataInputStream dataStreamFromClient,
+            DataOutputStream dataStreamToClient
+    ) throws Exception {
+
+        // Read checksum generated by the client.
         String clientChecksum = dataStreamFromClient.readUTF();
+
         System.out.println("Checksum received from client: " + clientChecksum);
 
+        // Read encrypted file metadata.
         String encryptedClientFileName = dataStreamFromClient.readUTF();
+
         int saltLength = dataStreamFromClient.readInt();
+
         byte[] salt = new byte[saltLength];
+
         dataStreamFromClient.readFully(salt);
+
         String password = dataStreamFromClient.readUTF();
 
         System.out.println("Encrypted file name: " + encryptedClientFileName);
         System.out.println("Salt value (hex): " + bytesToHex(salt));
         System.out.println("Password: " + password);
 
+        // Create destination path for received encrypted file.
         File destinationFile = new File(receivedFilesDir + encryptedClientFileName);
 
-        // Read file size from the client
-        long fileSize = dataStreamFromClient.readLong(); // Client sends the file size
+
+        long fileSize = dataStreamFromClient.readLong(); // Read file size sent by the client
         long bytesReceived = 0; // Track how many bytes have been received
 
         System.out.println("Expected file size: " + fileSize + " bytes.");
 
+        // Save encrypted file data received from the client.
         try (FileOutputStream fileOutputStream = new FileOutputStream(destinationFile)) {
             byte[] dataBuffer = new byte[4096];
             int bytesRead;
@@ -86,7 +181,11 @@ public class Server {
             // Continue reading data until the expected file size is reached
             while (bytesReceived < fileSize) {
                 bytesRead = dataStreamFromClient.read(dataBuffer);
-                if (bytesRead == -1) break; // End of stream
+
+                if (bytesRead == -1) {
+                    break; // End of stream
+                }
+
                 fileOutputStream.write(dataBuffer, 0, bytesRead);
                 bytesReceived += bytesRead;
 
@@ -97,28 +196,38 @@ public class Server {
             System.out.println("\nFile transfer complete. Total bytes received: " + bytesReceived + " bytes.");
         }
 
-        // Ensure the file size matches
+        // Verify file size matches expected size.
         if (bytesReceived != fileSize) {
             System.out.println("Warning: Mismatch in file size. Expected " + fileSize + ", but received " + bytesReceived);
         } else {
             System.out.println("File received successfully.");
         }
 
-        // Decrypt the file
+        // Generate secret key using password and salt
         SecretKey secretKey = FileEncryptor.KeyGenFromPassword(password, salt);
+
+        // Create decrypted output file.
         File decryptedFile = new File(decryptedFolder, "decrypted_" + encryptedClientFileName);
 
+        // Decrypt received enrypted file.
         try (
                 InputStream encryptedInputStream = new FileInputStream(destinationFile);
                 OutputStream decryptedOutputStream = new FileOutputStream(decryptedFile)
         ) {
-            FileEncryptor.decryptFile(encryptedInputStream, decryptedOutputStream, secretKey);
+            FileEncryptor.decryptFile(
+                    encryptedInputStream,
+                    decryptedOutputStream,
+                    secretKey
+            );
+
             System.out.println("File decrypted successfully at: " + decryptedFile.getAbsolutePath());
         }
 
+        // Calculate the checksum of decrypted file
         String decryptedChecksum = calculateChecksum(decryptedFile);
         System.out.println("Checksum of decrypted file: " + decryptedChecksum);
 
+        // Compare original checksum with decrypted checksum.
         if (clientChecksum.equals(decryptedChecksum)) {
             System.out.println("File integrity verified: Checksums match!------------------------------------------------------------------------------");
             dataStreamToClient.writeUTF("Checksum verification success: Files match!");
@@ -128,35 +237,77 @@ public class Server {
         }
     }
 
+    /**
+     * Calculates the SHA-256 checksum of a file.
+     *
+     * A checksum is used to verify data integrity and ensure the
+     * file contents were not modified or corrupted.
+     *
+     * @param file file whose checksum should be calculated.
+     * @return SHA-256 checksum represented as a hexadecimal string.
+     * @throws Exception if the file cannot be read or hashing fails.
+     */
     private static String calculateChecksum(File file) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
+
         try (InputStream fis = new FileInputStream(file)) {
+
             byte[] buffer = new byte[4096];
+
             int bytesRead;
+
             while ((bytesRead = fis.read(buffer)) != -1) {
+
                 digest.update(buffer, 0, bytesRead);
             }
         }
         byte[] checksumBytes = digest.digest();
+
         StringBuilder checksum = new StringBuilder();
+
         for (byte b : checksumBytes) {
+
             checksum.append(String.format("%02x", b));
         }
         return checksum.toString();
     }
 
+    /**
+     * Converts a byte array into a hexadecimal string.
+     *
+     * Commonly used for displaying binary values such as salts.
+     * or cryptographic hashes in a readable format.
+     *
+     * @param bytes byte array to convert
+     * @return hexadecimal string representation of the byte array.
+     */
     private static String bytesToHex(byte[] bytes) {
+
         StringBuilder hexString = new StringBuilder();
+
         for (byte b : bytes) {
+
             hexString.append(String.format("%02x", b));
+
         }
+
         return hexString.toString();
+
     }
 
+    /**
+     * Creates a directory if it does not already exist.
+     *
+     * @param directoryPath path of the directory to create.
+     */
     private static void createDirectory(String directoryPath) {
+
         File directory = new File(directoryPath);
+
         if (!directory.exists() && directory.mkdirs()) {
+
             System.out.println("Directory created at: " + directoryPath);
+
         }
     }
 }
