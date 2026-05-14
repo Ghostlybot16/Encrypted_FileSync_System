@@ -29,16 +29,11 @@ bin/
 .DS_Store
 
 # Ignore IntelliJ IDEA files
-./untitled.iml
-./Encrypted_FileSync_System.iml
-.idea/*.xml
-.name
-.idea/*
+.idea/
+*.iml
 
-#Ignore compiled .class files
-src/*.class
-src/client/Client.class
-src/server/Server.class
+#Ignore all compiled Java class files
+*.class
 
 #Ignore encrypted/decrypted and received files directory
 decrypted_data/
