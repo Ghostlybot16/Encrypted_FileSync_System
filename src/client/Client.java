@@ -5,7 +5,6 @@ import java.net.Socket;
 import java.util.Scanner;
 import javax.crypto.SecretKey;
 
-import utilities.FileEncryptor;
 import utilities.ChecksumUtil;
 
 /**
@@ -113,29 +112,10 @@ public class Client {
             DataInputStream incomingDataStream
     ) {
         try {
-            // Directory containing files that can be selecte for transfer.
-            File resourcesDirectory = new File("../resources/");
-            File[] availableFiles = resourcesDirectory.listFiles();
+            File nameOfFile = selectFileFromResources(scanner);
 
-            if (availableFiles == null || availableFiles.length == 0) {
-                System.out.println("No files found in the resources directory.");
-                return; // Ensure the return only exits this method, not the program.
-            }
-
-            System.out.println("Available files to send to server:\n");
-
-            for (File file : availableFiles) {
-                System.out.println("- " + file.getName());
-            }
-
-            System.out.println("Enter the name of the file you want to send:");
-            String userInputForFileName = scanner.nextLine();
-
-            File nameOfFile = new File(resourcesDirectory, userInputForFileName);
-
-            if (!nameOfFile.exists() || !nameOfFile.isFile()) {
-                System.out.println("File not found in directory.");
-                return; // Same here: ensure this just exits the method.
+            if (nameOfFile == null) {
+                return;
             }
 
             System.out.println("Chosen file to encrypt: " + nameOfFile.getName());
@@ -241,6 +221,65 @@ public class Client {
 
         } catch (Exception e) {
             System.out.println("An error occurred: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Displays available files from the resources directory and allows the user
+     * to select one file for transfer.
+     *
+     * This method:
+     * - Lists all files available in the resources directory.
+     * - Prompts the user to choose a file.
+     * - Validates the selected file exists.
+     * - Returns the selected file object if valid.
+     *
+     * @param scanner user input scanner used to read the selected file name.
+     * @return selected File object if valid, otherwise null
+     */
+    private static File selectFileFromResources(Scanner scanner) {
+
+        try {
+            File resourcesDirectory = new File("../resources/");
+
+            // Check if the resources directory exists for the user to use
+            if (!resourcesDirectory.exists()) {
+                System.out.println("Resources directory does not exist.\nIt needs to be created to allow file transfer.");
+                return null;
+            }
+
+            File[] availableFiles = resourcesDirectory.listFiles();
+
+            // Check if the resources directory is empty
+            if (availableFiles == null || availableFiles.length == 0) {
+                System.out.println("No files found in the resources directory.");
+                return null;
+            }
+
+            System.out.println("Available files to send to server:\n");
+
+            for (File file: availableFiles) {
+                System.out.println("- " + file.getName());
+            }
+
+            System.out.println("Enter the name of the file you want to send:");
+
+            String userInputForFileName = scanner.nextLine();
+
+            File selectedFile = new File(resourcesDirectory, userInputForFileName);
+
+            // Validate if user selected file exists and is a valid file to send.
+            if (!selectedFile.exists() || !selectedFile.isFile()) {
+                System.out.println("File not found in directory.");
+                return null;
+            }
+
+            return selectedFile;
+
+        } catch (Exception e) {
+            System.out.println("An error occured while selecting the file: " + e.getMessage());
+
+            return null;
         }
     }
 }
