@@ -5,6 +5,7 @@ import java.net.Socket;
 import java.util.Scanner;
 import javax.crypto.SecretKey;
 
+import utilities.FileEncryptor;
 import utilities.ChecksumUtil;
 
 /**
@@ -112,6 +113,7 @@ public class Client {
             DataInputStream incomingDataStream
     ) {
         try {
+            // Helper method is called
             File nameOfFile = selectFileFromResources(scanner);
 
             if (nameOfFile == null) {
@@ -146,14 +148,13 @@ public class Client {
             File encryptedFile = new File(encryptedFolder, encryptedFileName);
 
             // Encrypt the selected file and save it into encrypted_data directory.
-            try (
-                    InputStream inputFileStream = new FileInputStream(nameOfFile);
-                    OutputStream encryptedOutputStream = new FileOutputStream(encryptedFile)
-            ) {
-                FileEncryptor.encryptFile(inputFileStream, encryptedOutputStream, secretKey);
-                System.out.println("File encrypted successfully as: " + encryptedFileName);
-            } catch (Exception e) {
-                System.out.println("Error encrypting file: " + e.getMessage());
+            boolean encryptionSuccessful = encryptSelectedFile(
+                    nameOfFile,
+                    encryptedFile,
+                    secretKey
+            );
+
+            if (!encryptionSuccessful) {
                 return;
             }
 
@@ -280,6 +281,32 @@ public class Client {
             System.out.println("An error occured while selecting the file: " + e.getMessage());
 
             return null;
+        }
+    }
+
+    /**
+     * Encrypts the selected file and saves it inside the "encrypted_data" directory.
+     *
+     * @param originalFile original file selected by the user to become encrypted.
+     * @param encryptedFile file location where encrypted data will be saved.
+     * @param secretKey encryption key used to encrypt the file.
+     * @return true if encryption succeeds, otherwise false.
+     */
+    private static boolean encryptSelectedFile(
+            File originalFile,
+            File encryptedFile,
+            SecretKey secretKey
+    ) {
+        try (
+                InputStream inputFileStream = new FileInputStream(originalFile);
+                OutputStream encryptedOutputStream = new FileOutputStream(encryptedFile)
+        ) {
+            FileEncryptor.encryptFile(inputFileStream, encryptedOutputStream, secretKey);
+            System.out.println("File encrypted successfully as: " + encryptedFile.getName());
+            return true;
+        } catch (Exception e) {
+            System.out.println("Error encrypting file: " + e.getMessage());
+            return false;
         }
     }
 }
